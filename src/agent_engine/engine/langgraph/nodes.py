@@ -532,6 +532,9 @@ class OrchestratorNode:
 
     async def __call__(self, state: GraphState) -> dict[str, object]:
         candidates = self._filter_children(state)
+        # Load both system (optional persona) and orchestrator (required routing) prompts.
+        # Combined content will guide the orchestrator, falling back to description
+        # if neither exists.
         system_content = load_file(self._base_dir, self._spec.prompts.system)
         orchestrator_content = load_file(self._base_dir, self._spec.prompts.orchestrator)
         if system_content or orchestrator_content:
