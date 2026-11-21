@@ -1,5 +1,6 @@
 // Run: node src/agent_manager/api/static/widget.test.mjs
 import assert from "node:assert";
+import { readFile } from "node:fs/promises";
 
 class FakeClassList {
   constructor(element) {
@@ -339,5 +340,59 @@ globalThis.fetch = async (url) => {
 client = new AgentChatClient("https://api.example");
 assert.ok(client);
 await assert.rejects(() => client.sendMessage("conv-2", "break"), /HTTP 500/);
+
+// lucide-react ships the widget's icons and is bundled from the top-level
+// manifest. Keep the declared pin and the lockfile entry on the same, current
+// version so a rebuild uses the icon set this source imports.
+const MINIMUM_LUCIDE_VERSION = [1, 77, 0];
+
+function parseVersion(spec) {
+  const match = /^\D*(\d+)\.(\d+)\.(\d+)/.exec(spec ?? "");
+  assert.ok(match, `cannot parse a version from ${JSON.stringify(spec)}`);
+  return match.slice(1, 4).map((part) => Number(part));
+}
+
+function compareVersions(left, right) {
+  for (let index = 0; index < 3; index += 1) {
+    if (left[index] !== right[index]) return left[index] - right[index];
+  }
+  return 0;
+}
+
+function satisfiesRange(version, range) {
+  const operator = range.startsWith("^") ? "^" : range.startsWith("~") ? "~" : "=";
+  const target = parseVersion(range);
+  const order = compareVersions(version, target);
+  if (order < 0) return false;
+  if (operator === "=") return order === 0;
+  if (operator === "~") return version[0] === target[0] && version[1] === target[1];
+  return version[0] === target[0];
+}
+
+const projectRoot = new URL("../../../../", import.meta.url);
+const manifest = JSON.parse(await readFile(new URL("package.json", projectRoot), "utf8"));
+const lockfile = JSON.parse(await readFile(new URL("package-lock.json", projectRoot), "utf8"));
+
+const declaredRange = manifest.dependencies?.["lucide-react"];
+assert.ok(declaredRange, "lucide-react must stay a direct dependency of the widget");
+
+const lockedEntry = lockfile.packages?.["node_modules/lucide-react"];
+assert.ok(lockedEntry?.version, "lucide-react must be present in package-lock.json");
+
+const declaredVersion = parseVersion(declaredRange);
+const lockedVersion = parseVersion(lockedEntry.version);
+const minimum = MINIMUM_LUCIDE_VERSION.join(".");
+assert.ok(
+  compareVersions(declaredVersion, MINIMUM_LUCIDE_VERSION) >= 0,
+  `lucide-react must be pinned at >= ${minimum} (found ${declaredRange})`,
+);
+assert.ok(
+  compareVersions(lockedVersion, MINIMUM_LUCIDE_VERSION) >= 0,
+  `package-lock.json must lock lucide-react >= ${minimum} (found ${lockedEntry.version})`,
+);
+assert.ok(
+  satisfiesRange(lockedVersion, declaredRange),
+  `package-lock.json (${lockedEntry.version}) must satisfy the manifest range ${declaredRange}`,
+);
 
 console.log("widget self-check: OK");
