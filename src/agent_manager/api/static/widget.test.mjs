@@ -344,7 +344,7 @@ await assert.rejects(() => client.sendMessage("conv-2", "break"), /HTTP 500/);
 // lucide-react ships the widget's icons and is bundled from the top-level
 // manifest. Keep the declared pin and the lockfile entry on the same, current
 // version so a rebuild uses the icon set this source imports.
-const MINIMUM_LUCIDE_VERSION = [1, 77, 0];
+const MINIMUM_LUCIDE_VERSION = [1, 83, 0];
 
 function parseVersion(spec) {
   const match = /^\D*(\d+)\.(\d+)\.(\d+)/.exec(spec ?? "");
